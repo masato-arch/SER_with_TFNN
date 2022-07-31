@@ -3,7 +3,7 @@
 """
 Created on Fri Jul 29 21:44:48 2022
 
-@author: Masato Arasaki
+@author: Ark_001
 
 """
 
@@ -83,7 +83,7 @@ class IEMOCAP_loader:
         return melsp_datas, labels, speakers
     
     """
-    Following codes are for internal processing.
+    Following codes are for internal processings.
     You don't have to read.
     """        
     def _constrain_dataset(self, wav_datas, labels, speakers, required_labels=['Anger', 'Happiness', 'Sadness', 'Neutral'], excite_happy_marge=True):
@@ -325,5 +325,3 @@ class IEMOCAP_loader:
         with open(pickle_path, 'wb') as pf:
             pickle.dump(data, pf)
         
-        
-loader = IEMOCAP_loader()
