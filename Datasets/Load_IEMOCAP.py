@@ -37,13 +37,15 @@ class IEMOCAP_loader:
         self.wav_pickle_path = 'IEMOCAP_wav.pkl'
         self.melsp_pickle_path = 'IEMOCAP_melspectrogram.pkl'
         self.labels_pickle_path = 'IEMOCAP_labels.pkl'
+        self.speakers_pickle_path = 'IEMOCAP_speakers.pkl'
         
-        if not exists(self.wav_pickle_path) or not exists(self.labels_pickle_path):
+        if not exists(self.wav_pickle_path) or not exists(self.labels_pickle_path) or not exists(self.speakers_pickle_path):
             print('pkl files not found. retrieveing datasets.')
-            initial_wav_datas, initial_labels, _ = self._load_data()
-            wav_datas, labels = self._constrain_dataset(initial_wav_datas, initial_labels)
+            initial_wav_datas, initial_labels, initial_speakers, _ = self._load_data()
+            wav_datas, labels, speakers = self._constrain_dataset(initial_wav_datas, initial_labels, initial_speakers)
             self._save_pickle(wav_datas, self.wav_pickle_path)
             self._save_pickle(labels, self.labels_pickle_path)
+            self._save_pickle(speakers, self.speakers_pickle_path)
             print('done.')
             
     # =============================================================================
@@ -52,12 +54,16 @@ class IEMOCAP_loader:
     #   load_melsp_dataset(): returns dataset of 128x98 mel-spectrograms and labels
     # =============================================================================
     
-    def load_wav_dataset(self):
+    def load_wav_dataset(self, requires_speakers=False):
         wav_datas = self._load_pickle(self.wav_pickle_path)
         labels = self._load_pickle(self.labels_pickle_path)
-        return wav_datas, labels
+        if requires_speakers:
+            speakers = self._load_pickle(self.speakers_pickle_path)
+        else:
+            speakers = None
+        return wav_datas, labels, speakers
     
-    def load_melsp_dataset(self):
+    def load_melsp_dataset(self, requires_speakers=False):
         if not exists(self.melsp_pickle_path):
             print('pkl file not found. calculating mel spectorgrams.')
             print('this process may take several minutes...')
@@ -67,15 +73,20 @@ class IEMOCAP_loader:
             print('done.')
         else:
             melsp_datas = self._load_pickle(self.melsp_pickle_path)
+            
+        if requires_speakers:
+            speakers = self._load_pickle(self.speakers_pickle_path)
+        else:
+            speakers = None
         
         labels = self._load_pickle(self.labels_pickle_path)
-        return melsp_datas, labels
+        return melsp_datas, labels, speakers
     
     """
     Following codes are for internal processing.
     You don't have to read.
     """        
-    def _constrain_dataset(self, wav_datas, labels, required_labels=['Anger', 'Happiness', 'Sadness', 'Neutral'], excite_happy_marge=True):
+    def _constrain_dataset(self, wav_datas, labels, speakers, required_labels=['Anger', 'Happiness', 'Sadness', 'Neutral'], excite_happy_marge=True):
         # =============================================================================
         # Method to retrieve only required datas.
         # 
@@ -94,13 +105,14 @@ class IEMOCAP_loader:
                     labels[i] = 'Happiness'
                     
         
-        req_datas, req_labels = [], []
-        for data, label in zip(wav_datas, labels):
+        req_datas, req_labels, req_speakers = [], [], []
+        for data, label, speaker in zip(wav_datas, labels, speakers):
             if label in required_labels:
                 req_datas.append(data)
                 req_labels.append(label)
+                req_speakers.append(speaker)
         
-        return req_datas, req_labels
+        return req_datas, req_labels, req_speakers
         
     def _calculate_melsp_datas(self, wav_data, len_segment=50000, fft_params=(2048, 512)):
         
@@ -250,6 +262,11 @@ class IEMOCAP_loader:
                 else:
                     # print(f'labels:{labels} rejected')
                     return None
+        
+        def _extract_speaker(filename):
+            session_name = filename[:5]
+            sex = filename[-4]
+            return session_name + sex
                 
         def _extract_values_from_lines(lines):
             filenames_tobe_same = []
@@ -268,11 +285,13 @@ class IEMOCAP_loader:
                 filename = list(set(filenames_tobe_same))[0]
             
             label = _majority_voting(labels_for_majority_voting)
+            speaker = _extract_speaker(filename)
             
-            return filename, label, comments, labels_for_majority_voting
+            return filename, label, speaker, comments
         
         approved_wav_paths = []
         approved_labels = []
+        approved_speakers = []
         comments = {}
         for labelfiles in dialogwise_labelfiles:
             file_descriptors = [open(labelfile, 'r') for labelfile in labelfiles]
@@ -281,12 +300,13 @@ class IEMOCAP_loader:
                 if '' in lines:
                     break
                 else:
-                    filename, label, comments_, labels_ = _extract_values_from_lines(lines)
+                    filename, label, speaker, comments_ = _extract_values_from_lines(lines)
                     if label != None:
                         # print(f'labels:{labels_}, approved')
                         wav_idx = wav_filename_wo_ext.index(filename)
                         approved_wav_paths.append(wav_file_paths[wav_idx])
                         approved_labels.append(label)
+                        approved_speakers.append(speaker)
                         comments[filename] = comments_
         
         approved_wav_datas = []
@@ -294,7 +314,7 @@ class IEMOCAP_loader:
             x, fs = librosa.load(path, sr=16000)
             approved_wav_datas.append(x)
                 
-        return approved_wav_datas, approved_labels, comments
+        return approved_wav_datas, approved_labels, approved_speakers, comments
     
     def _load_pickle(self, pickle_path):
         with open(pickle_path, 'rb') as pf:

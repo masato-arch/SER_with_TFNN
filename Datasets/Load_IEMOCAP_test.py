@@ -6,6 +6,7 @@ Created on Sat Jul 30 10:52:02 2022
 @author: Masato Arasaki
 """
 import os
+from os.path import exists
 import audeer
 import re
 import collections
@@ -14,6 +15,9 @@ import math
 import numpy as np
 import pickle
 
+"""
+NOTE: This file is 
+"""
 
 """
 retrieving paths of wav files and label files
@@ -118,7 +122,12 @@ def majority_voting(labels):
         else:
             # print(f'labels:{labels} rejected')
             return None
-        
+
+def extract_speaker(filename):
+    session_name = filename[:5]
+    sex = filename[-4]
+    return session_name + sex
+            
 def extract_values_from_lines(lines):
     filenames_tobe_same = []
     labels_for_majority_voting = []
@@ -136,11 +145,13 @@ def extract_values_from_lines(lines):
         filename = list(set(filenames_tobe_same))[0]
     
     label = majority_voting(labels_for_majority_voting)
+    speaker = extract_speaker(filename)
     
-    return filename, label, comments, labels_for_majority_voting
+    return filename, label, speaker, comments
 
 approved_wav_paths = []
 approved_labels = []
+approved_speakers = []
 comments = {}
 for labelfiles in dialogwise_labelfiles:
     file_descriptors = [open(labelfile, 'r') for labelfile in labelfiles]
@@ -149,18 +160,19 @@ for labelfiles in dialogwise_labelfiles:
         if '' in lines:
             break
         else:
-            filename, label, comments_, labels_ = extract_values_from_lines(lines)
+            filename, label, speaker, comments_ = extract_values_from_lines(lines)
             if label != None:
                 # print(f'labels:{labels_}, approved')
                 wav_idx = wav_filename_wo_ext.index(filename)
                 approved_wav_paths.append(wav_file_paths[wav_idx])
                 approved_labels.append(label)
+                approved_speakers.append(speaker)
                 comments[filename] = comments_
 
-wav_data = []
+wav_datas = []
 for path in approved_wav_paths:
     x, fs = librosa.load(path, sr=16000)
-    wav_data.append(x)
+    wav_datas.append(x)
 
 ## skip this part (bugfix log)
 ## =============================================================================
@@ -216,21 +228,21 @@ select only the datas labeled with required classes
 #   which are ['Anger', 'Happiness', 'Sadness', 'Neutral']
 #   because the other classes doesn't have enough amount of data
 # =============================================================================
-def dataset_with_necessary_classes(datas, labels, necessary_classes):
-    necessary_datas, necessary_labels = [], []
-    for data, label in zip(datas, labels):
-        if label in necessary_classes:
-            necessary_datas.append(data)
-            necessary_labels.append(label)
+def dataset_with_required_classes(datas, labels, speakers, required_labels=['Anger', 'Happiness', 'Sadness', 'Neutral']):
+    req_datas, req_labels, req_speakers = [], [], []
+    for data, label, speaker in zip(datas, labels, speakers):
+        if label in required_labels:
+            req_datas.append(data)
+            req_labels.append(label)
+            req_speakers.append(speaker)
     
-    return necessary_datas, necessary_labels
+    return req_datas, req_labels, req_speakers
 
 for i in range(len(approved_labels)):
     if approved_labels[i] == 'Excited':
         approved_labels[i] = 'Happiness'
 
-necessary_datas, necessary_labels = dataset_with_necessary_classes(wav_data, approved_labels, 
-                                                                   necessary_classes=['Anger', 'Happiness', 'Sadness', 'Neutral'])
+required_datas, required_labels, required_speakers = dataset_with_required_classes(wav_datas, approved_labels, approved_speakers)
 
 """
 create spectrogram dataset
@@ -284,7 +296,20 @@ def _calculate_melsp_datas(wav_data, len_segment=50000, fft_params=(2048, 512)):
     
     return melsp_datas
 
-melsp_datas = _calculate_melsp_datas(necessary_datas)
+# melsp_datas = _calculate_melsp_datas(necessary_datas)
 
-with open('IEMOCAP_melspectrogram.pkl', 'xb') as mf:
-    pickle.dump(melsp_datas, mf)
+"""
+Save processed files with pickle
+"""
+wav_pickle_path = 'IEMOCAP_wav.pkl'
+labels_pickle_path = 'IEMOCAP_labels.pkl'
+speakers_pickle_path = 'IEMOCAP_speakers.pkl'
+
+def save_pickle(datas, pickle_path):
+    if not exists(pickle_path):
+        with open(pickle_path, 'wb') as pf:
+            pickle.dump(datas, pf)
+
+save_pickle(required_datas, wav_pickle_path)
+save_pickle(required_labels, labels_pickle_path)
+save_pickle(required_speakers, speakers_pickle_path)
