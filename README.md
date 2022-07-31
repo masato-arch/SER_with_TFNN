@@ -1,4 +1,4 @@
-# SpeechEmotionRecognition
+# SER_with_TFNN
 大学院で研究してる音声感情認識のプロジェクトを管理するためのリポジトリです．
 
 ## 概要
