@@ -46,7 +46,7 @@ class IEMOCAP_loader:
         self.labels_pickle_path = os.path.join(self.pickle_path, 'IEMOCAP_labels.pkl')
         self.speakers_pickle_path = os.path.join(self.pickle_path, 'IEMOCAP_speakers.pkl')
         
-        # and storage the pickle files of wav and label datas.
+        # if we don't have preprocessed pickle dataset, it is retrieved from <project folder>/Datasets/IEMOCAP_full_release
         if not exists(self.wav_pickle_path) or not exists(self.labels_pickle_path) or not exists(self.speakers_pickle_path):
             print('pkl files not found. retrieveing datasets.')
             
