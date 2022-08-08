@@ -16,37 +16,56 @@ import librosa
 import audeer
 import math
 import numpy as np
+import tqdm
 
 
-"""
-REQUIREMENT: Please put 'IEMOCAP_full_release' in the same directory.
-"""
+
 
 class IEMOCAP_loader:
     
-    def __init__(self):
+    def __init__(self, dataset_path='./Datasets'):
         
+        """
+        REQUIREMENS:
+            1, Please put this file in the <project folder>/Datasets/
+            2, Please put 'IEMOCAP_full_release' folder in abovementionded path.
+        """
         # =============================================================================
         # Initialize the module
-        #
+        # 
         # The module holds paths to pickle files of preprocessed wav, labels and melspectrograms
         # 
-        # 
-        # If you don't have pickle, the dataset will be retrieved from ./IEMOCAP_full_release.
+        # If we don't have pickle, the dataset will be retrieved from dataset_path/IEMOCAP_full_release.
         # =============================================================================
-        self.wav_pickle_path = 'IEMOCAP_wav.pkl'
-        self.melsp_pickle_path = 'IEMOCAP_melspectrogram.pkl'
-        self.labels_pickle_path = 'IEMOCAP_labels.pkl'
-        self.speakers_pickle_path = 'IEMOCAP_speakers.pkl'
+        self.dataset_path = dataset_path # the path in which IEMOCAP_full_release exists
+        self.pickle_path = os.path.join(dataset_path, 'pickles') # the path to storage pickle files
         
+        # the paths for data files
+        self.wav_pickle_path = os.path.join(self.pickle_path, 'IEMOCAP_wav.pkl')
+        self.melsp_pickle_path = os.path.join(self.pickle_path, 'IEMOCAP_melspectrogram.pkl')
+        self.labels_pickle_path = os.path.join(self.pickle_path, 'IEMOCAP_labels.pkl')
+        self.speakers_pickle_path = os.path.join(self.pickle_path, 'IEMOCAP_speakers.pkl')
+        
+        # and storage the pickle files of wav and label datas.
         if not exists(self.wav_pickle_path) or not exists(self.labels_pickle_path) or not exists(self.speakers_pickle_path):
             print('pkl files not found. retrieveing datasets.')
+            
+            # if we don't have dataset_path/pickles folder, create one
+            if not exists(self.pickle_path):
+                os.mkdir(self.pickle_path)
+            
+            # retrieve unconstraint (initial) wav, label and speaker datas from 'IEMOCAP_full_release'
             initial_wav_datas, initial_labels, initial_speakers, _ = self._load_data()
+            
+            # remove unwanted datas
             wav_datas, labels, speakers = self._constrain_dataset(initial_wav_datas, initial_labels, initial_speakers)
+            
+            # storage the cleansed datas
+            print('saving datas as .pkl files...')
             self._save_pickle(wav_datas, self.wav_pickle_path)
             self._save_pickle(labels, self.labels_pickle_path)
             self._save_pickle(speakers, self.speakers_pickle_path)
-            print('done.')
+            print('pickle files were successfully created.')
             
     # =============================================================================
     # User Interfaces:
@@ -69,8 +88,10 @@ class IEMOCAP_loader:
             print('this process may take several minutes...')
             wav_datas = self._load_pickle(self.wav_pickle_path)
             melsp_datas = self._calculate_melsp_datas(wav_datas)
+            
+            print('saving mel spectrograms as pickle files...')
             self._save_pickle(melsp_datas, self.melsp_pickle_path)
-            print('done.')
+            print('pickle file was successfully created.')
         else:
             melsp_datas = self._load_pickle(self.melsp_pickle_path)
             
@@ -138,7 +159,7 @@ class IEMOCAP_loader:
         
         def _calculate_melsp_from_segments(segmented_wav_datas, n_fft=fft_params[0], hop_length=fft_params[1]):
             melsp_datas = []
-            for wav_data in segmented_wav_datas:
+            for wav_data in tqdm.tqdm(segmented_wav_datas):
                 melsp_data = []
                 for segment in wav_data:
                     melsp = _calculate_melsp(segment)
@@ -162,8 +183,9 @@ class IEMOCAP_loader:
         """
         retrieving paths of wav files and label files
         """
-        wav_dirs = [os.path.join('IEMOCAP_full_release', 'Session' + str(i), 'sentences', 'wav') for i in range(1, 6)]
-        label_dirs = [os.path.join('IEMOCAP_full_release', 'Session' + str(i), 'dialog', 'EmoEvaluation', 'Categorical') for i in range(1, 6)]
+        print('retrieving paths...')
+        wav_dirs = [os.path.join(self.dataset_path, 'IEMOCAP_full_release', 'Session' + str(i), 'sentences', 'wav') for i in range(1, 6)]
+        label_dirs = [os.path.join(self.dataset_path, 'IEMOCAP_full_release', 'Session' + str(i), 'dialog', 'EmoEvaluation', 'Categorical') for i in range(1, 6)]
         
         def _retrieve_paths(parent_paths, select_func=None):
             target_paths = []
@@ -198,10 +220,14 @@ class IEMOCAP_loader:
         
         # paths for every label file 
         label_file_paths = _retrieve_paths(label_dirs, select_func=_is_txtfile)
+        
+        print('done.')
     
         """
         Retrieving labels for every utterance
         """
+        
+        print('retrieving labels for every utterance...')
         
         # name of every speech dialogs
         dialog_names = [audeer.basename_wo_ext(p) for p in wav_file_paths_p]
@@ -289,6 +315,9 @@ class IEMOCAP_loader:
             
             return filename, label, speaker, comments
         
+        print('done.')
+        print('removing unwanted datas...')
+        
         approved_wav_paths = []
         approved_labels = []
         approved_speakers = []
@@ -309,11 +338,14 @@ class IEMOCAP_loader:
                         approved_speakers.append(speaker)
                         comments[filename] = comments_
         
+        print('done.')
+        print('loading wav files, this process may take long...')
         approved_wav_datas = []
-        for path in approved_wav_paths:
+        for path in tqdm.tqdm(approved_wav_paths):
             x, fs = librosa.load(path, sr=16000)
             approved_wav_datas.append(x)
-                
+        
+        print('done.')
         return approved_wav_datas, approved_labels, approved_speakers, comments
     
     def _load_pickle(self, pickle_path):
@@ -325,3 +357,5 @@ class IEMOCAP_loader:
         with open(pickle_path, 'wb') as pf:
             pickle.dump(data, pf)
         
+
+loader = IEMOCAP_loader(dataset_path='.')

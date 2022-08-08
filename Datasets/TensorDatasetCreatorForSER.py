@@ -87,7 +87,7 @@ class TensorDatasetCreatorForSER:
         self.random_seed = random_seed
     
     """
-    Following codes are for internal processings. You don't have to read.'
+    Following codes are for internal processings. You don't have to read.
     """
     def _create_train_dataset(self, datas, labels):
         # =============================================================================

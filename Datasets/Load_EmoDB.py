@@ -13,32 +13,49 @@ import librosa
 import math
 import numpy as np
 import pickle
-
+import tqdm
 
 class EmoDB_loader:
     
-    def __init__(self):
-        
+    def __init__(self, dataset_path='./Datasets'):
+        """
+        REQUIREMENTS:
+            1, Please put this file in the <project folder>/Datasets/
+            2, Please put 'EmoDB' folder in abovementionded path.
+        """
         # =============================================================================
         # Initialize the module
         #
         # The module holds paths to pickle files of preprocessed wav, labels and melspectrograms.
         # 
-        # If you don't have pickle, the dataset will be retrieved from ./EmoDB
+        # If we don't have pickle, the dataset will be retrieved from dataset_path/EmoDB
         # =============================================================================
-        self.wav_pickle_path = 'EmoDB_wav.pkl'
-        self.melsp_pickle_path = 'EmoDB_melspectrogram.pkl'
-        self.labels_pickle_path = 'EmoDB_labels.pkl'
-        self.speakers_pickle_path = 'EmoDB_speakers.pkl'
+        self.dataset_path = dataset_path # the path in which 'EmoDB' folder exists
+        self.pickle_path = os.path.join(dataset_path, 'pickles') # the path to storage pickle files
         
+        # paths to data files
+        self.wav_pickle_path = os.path.join(self.pickle_path, 'EmoDB_wav.pkl')
+        self.melsp_pickle_path = os.path.join(self.pickle_path, 'EmoDB_melspectrogram.pkl')
+        self.labels_pickle_path = os.path.join(self.pickle_path, 'EmoDB_labels.pkl')
+        self.speakers_pickle_path = os.path.join(self.pickle_path, 'EmoDB_speakers.pkl')
+        
+        # if we don't have preprocessed pickle files, retrieve the dataset from 'EmoDB'
         if not exists(self.wav_pickle_path) or not exists(self.labels_pickle_path) or not exists(self.speakers_pickle_path):
+            
+            # if we don't have 'pickles' folder, create one
             print('pkl files not found. retrieveing datasets.')
+            if not exists(self.pickle_path):
+                os.mkdir(self.pickle_path)
+            
+            # retrieve wav, label and speaker datas from 'EmoDB' folder
             initial_wav_datas, initial_labels, initial_speakers = self._load_data()
             wav_datas, labels, speakers = self._constrain_dataset(initial_wav_datas, initial_labels, initial_speakers)
+            
+            # save them
             self._save_pickle(wav_datas, self.wav_pickle_path)
             self._save_pickle(labels, self.labels_pickle_path)
             self._save_pickle(speakers, self.speakers_pickle_path)
-            print('done.')
+            print('pkl files were successfully created.')
             
     # =============================================================================
     # User Interfaces:
@@ -146,13 +163,17 @@ class EmoDB_loader:
         """
         Retrieving paths to every wav files.
         """
-        base_dir = './EmoDB/wav/'
+        print('retrieving paths...')
+        base_dir = os.path.join(self.dataset_path, 'EmoDB/wav/')
         wav_paths = sorted([os.path.join(base_dir, f) for f in os.listdir(base_dir)])
-        
+        print('done.')
         
         """
         Retrieving infomations of labels and speakers.
         """
+        
+        print('retrieving the informations of emotions and speakers...')
+        
         # Method to extract other infomations from filename
         def _parse_names(names, from_i, to_i, is_number=False, mapping=None):
             for name in names:
@@ -176,13 +197,15 @@ class EmoDB_loader:
         speakers = list(_parse_names(filenames, from_i=0, to_i=2, is_number=True))
         emotions = list(_parse_names(filenames, from_i=5, to_i=6, mapping=emotion_mapping))
         
+        print('done.')
+        print('loading wav files, this process may take long...')
+        
         wav_datas = []
-        for p in wav_paths:
+        for p in tqdm.tqdm(wav_paths):
             x, fs = librosa.load(p, sr=16000)
             wav_datas.append(x)
         
         return wav_datas, emotions, speakers
-    
     def _load_pickle(self, pickle_path):
         with open(pickle_path, 'rb') as pf:
             data = pickle.load(pf)
