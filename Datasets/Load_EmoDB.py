@@ -214,5 +214,3 @@ class EmoDB_loader:
     def _save_pickle(self, data, pickle_path):
         with open(pickle_path, 'wb') as pf:
             pickle.dump(data, pf)
-        
-loader = EmoDB_loader()

@@ -11,8 +11,6 @@ from torch.utils.data import ConcatDataset
 import numpy as np
 import random
 from sklearn.model_selection import train_test_split
-from Load_IEMOCAP import IEMOCAP_loader
-from Load_EmoDB import EmoDB_loader
 
 class TensorDatasetCreatorForSER:
     
@@ -55,8 +53,8 @@ class TensorDatasetCreatorForSER:
         # create the TensorDatasets
         # sd stands for speaker-dependent
         sd_train_dataset = self._create_train_dataset(train_datas, train_labels)
-        sd_test_dataset = self._create_test_dataset(test_datas, test_labels)
-        return sd_train_dataset, sd_test_dataset
+        sd_test_datasets = self._create_test_dataset(test_datas, test_labels)
+        return sd_train_dataset, sd_test_datasets
     
     def speaker_independent_dataset(self, datas, labels, speakers, test_speakers=None):
         # =============================================================================
@@ -77,11 +75,11 @@ class TensorDatasetCreatorForSER:
         
         # create the TensorDatasets
         si_train_dataset = self._create_train_dataset(si_train_datas, si_train_labels)
-        si_test_dataset = self._create_test_dataset(si_test_datas, si_test_labels)
+        si_test_datasets = self._create_test_dataset(si_test_datas, si_test_labels)
         
         print(f'Speaker-independent dataset created. Test speakers:{test_speakers}')
         
-        return si_train_dataset, si_test_dataset, test_speakers
+        return si_train_dataset, si_test_datasets, test_speakers
     
     def set_random_seed(self, random_seed):
         self.random_seed = random_seed
@@ -133,9 +131,9 @@ class TensorDatasetCreatorForSER:
         test_datas = [torch.FloatTensor(np.array(td)) for td in test_datas]
         test_labels = [torch.LongTensor(np.array(tl)) for tl in test_labels]
         test_datasets = [TensorDataset(test_datas[i], test_labels[i]) for i in range(len(test_datas))]
-        test_dataset = ConcatDataset(test_datasets)
+        # test_dataset = ConcatDataset(test_datasets) this caused a bug 
         
-        return test_dataset
+        return test_datasets
     
     def _speaker_independent_data_split(self, datas, labels, speakers, test_speakers):
         train_datas, test_datas, train_labels, test_labels = [], [], [], []

@@ -69,8 +69,8 @@ class IEMOCAP_loader:
             
     # =============================================================================
     # User Interfaces:
-    #   load_wav_dataaset(): returns dataset of raw wav audios and labels
-    #   load_melsp_dataset(): returns dataset of 128x98 mel-spectrograms and labels
+    #   load_wav_dataaset(): returns dataset of raw wav audios, labels and speakers(if required)
+    #   load_melsp_dataset(): returns dataset of 128x98 mel-spectrograms, labels and speakers(if required)
     # =============================================================================
     
     def load_wav_dataset(self, requires_speakers=False):
@@ -119,13 +119,11 @@ class IEMOCAP_loader:
         #   since they are close in valence and activation domain.
         # =============================================================================
         
-        
         if excite_happy_marge:
             for i in range(len(labels)):
                 if labels[i] == 'Excited':
                     labels[i] = 'Happiness'
                     
-        
         req_datas, req_labels, req_speakers = [], [], []
         for data, label, speaker in zip(wav_datas, labels, speakers):
             if label in required_labels:
@@ -356,6 +354,3 @@ class IEMOCAP_loader:
     def _save_pickle(self, data, pickle_path):
         with open(pickle_path, 'wb') as pf:
             pickle.dump(data, pf)
-        
-
-loader = IEMOCAP_loader(dataset_path='.')

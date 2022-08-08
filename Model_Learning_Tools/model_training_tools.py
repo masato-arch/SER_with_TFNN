@@ -18,6 +18,7 @@ import pandas as pd
 # User Interfaces:
 #   train_epoch(): Method for 1 epoch training
 #   valid(): Method for validation during training
+#   valid_multi_dataloaders() validation during training for multiple test dataloaders
 #   display_log(): Method to display the log during training
 #   classification_test(): Method for calculating confusion matrix and accuracy after training
 # =============================================================================
@@ -27,10 +28,12 @@ def train_epoch(model, trainloader, criterion, optimizer, device='cpu',
     
     """Method to train the model for 1 epoch"""
     
+    # initialize the model
+    model.train()
     train_loss = 0.0
     running_loss = 0.0
 
-    # if you want to measure time, start measuring here
+    # if time measurement is enabled, start measuring here
     if measure_time:
         start = torch.cuda.Event(enable_timing=True)
         end = torch.cuda.Event(enable_timing=True)
@@ -66,21 +69,17 @@ def train_epoch(model, trainloader, criterion, optimizer, device='cpu',
     # return train loss and elapsed time
     train_loss /= len(trainloader)
     return train_loss, elapsed_time
-
-def valid(model, testloader, criterion, device='cpu', measure_time=False):
+        
+def valid(model, testloader, criterion, device='cpu'):
     
     """Method to test the model"""
+    # initilaize the model
+    model.eval()
     
     with torch.no_grad():
         total = 0
         correct = 0
         test_loss = 0
-
-        # if time measurement is enabled, start here
-        if measure_time:
-            start = torch.cuda.Event(enable_timing=True)
-            end = torch.cuda.Event(enable_timing=True)
-            start.record()
             
         # forward processing
         for data in testloader:
@@ -96,20 +95,44 @@ def valid(model, testloader, criterion, device='cpu', measure_time=False):
             _, prediction = torch.max(outputs, 1)
             total += len(outputs)
             correct += (prediction==labels).sum().item()
-        
-        # if time measurement is enabled, end here
-        if measure_time:
-            end.record()
-            torch.cuda.synchronize()
-            elapsed_time = start.elapsed_time(end) / 1000
-        else:
-            elapsed_time = None
+            # debug log
+            print(f'valid_t: corrects_:{(prediction==labels).sum().item()}, total_:{len(outputs)}')
+            print(f'valid_t: corrects: {correct}, total:{total}')
         
         test_loss /= len(testloader)
         test_accuracy = correct / total
 
-    return test_loss, test_accuracy, elapsed_time
+    return test_loss, test_accuracy
 
+def valid_multi_dataloaders(model, testloaders, criterion, device='cpu'):
+    # =============================================================================
+    # Method for validation with multiple dataloaders.
+    # The number of speech segments is different for each files, 
+    #   so we need multiple dataloaders for validation.
+    # =============================================================================
+    with torch.no_grad():
+        # total dataloader length for calculating mean loss
+        dataloader_len = sum([len(loader) for loader in testloaders])
+        model.eval()
+        
+        corrects = 0
+        total = 0
+        valid_loss = 0.0
+        
+        # calculate total loss, number of correct answers and number of datas over all dataloaders
+        for loader in testloaders:
+            v_loss, corrects_, total_ = _half_valid(model, loader, criterion, device=device)
+            print(f'valid_v: corrects_:{corrects_}, total_:{total_}')
+            valid_loss += v_loss
+            corrects += corrects_
+            total += total_
+            print(f'valid_v: corrects:{corrects}, total:{total}')
+        
+        # calculate means of them
+        valid_loss /= dataloader_len
+        valid_accuracy = corrects / total
+    
+    return valid_loss, valid_accuracy
 def display_log(train_losses, test_losses, train_accuracy, test_accuracy, epoch=None):
     
     """Method to display the learning process"""
@@ -181,3 +204,32 @@ def _show_confusion_matrix(cm):
     plt.xlabel('Predicted')
     plt.ylabel('True labels')
     plt.show()
+    
+def _half_valid(model, testloader, criterion, device='cpu'):
+    # =============================================================================
+    # Valid method for valid_multi_dataloaders() method.
+    # 'half' means that the loss and accuracy aren't be calculated completely.
+    # Returns the total loss, the total number of data, 
+    #   and the number of correct answers in a single dataloader.
+    # =============================================================================
+    with torch.no_grad():
+        total = 0
+        correct = 0
+        valid_loss = 0
+            
+        # forward processing
+        for data in testloader:
+            inputs, labels = data
+            inputs = inputs.to(device)
+            labels = labels.to(device)
+
+            outputs = model(inputs)
+
+            # calculating the test loss
+            valid_loss += criterion(outputs, labels).item()
+            # calculating the accuracy
+            _, prediction = torch.max(outputs, 1)
+            total += len(outputs)
+            correct += (prediction==labels).sum().item()
+
+    return valid_loss, correct, total
