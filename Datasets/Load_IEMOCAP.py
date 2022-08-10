@@ -27,6 +27,9 @@ class IEMOCAP_loader:
         REQUIREMENS:
             1, Please put this file in the <project folder>/Datasets/
             2, Please put 'IEMOCAP_full_release' folder in abovementionded path.
+            
+            NOTE: 'IEMOCAP_full_release' is the directory name in which IEMOCAP dataset 
+                    is contained when you get one from official site.
         """
         # =============================================================================
         # Initialize the module
@@ -44,7 +47,7 @@ class IEMOCAP_loader:
         self.labels_pickle_path = os.path.join(self.pickle_path, 'IEMOCAP_labels.pkl')
         self.speakers_pickle_path = os.path.join(self.pickle_path, 'IEMOCAP_speakers.pkl')
         
-        # if we don't have preprocessed pickle dataset, it is retrieved from <project folder>/Datasets/IEMOCAP_full_release
+        # if we don't have preprocessed pickle dataset, it is retrieved from 'IEMOCAP_full_release/'
         if not exists(self.wav_pickle_path) or not exists(self.labels_pickle_path) or not exists(self.speakers_pickle_path):
             print('pkl files not found. retrieveing datasets.')
             
@@ -52,7 +55,7 @@ class IEMOCAP_loader:
             if not exists(self.pickle_path):
                 os.mkdir(self.pickle_path)
             
-            # retrieve unconstraint (initial) wav, label and speaker datas from 'IEMOCAP_full_release'
+            # retrieve unconstraint (initial) wav, label and speaker datas from 'IEMOCAP_full_release/'
             initial_wav_datas, initial_labels, initial_speakers, _ = self._load_data()
             
             # remove unwanted datas

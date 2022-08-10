@@ -12,20 +12,18 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 
 # Following modules are self-made
-from Datasets.Load_EmoDB import EmoDB_loader
-from Datasets.Load_IEMOCAP import IEMOCAP_loader
-from Datasets.TensorDatasetCreatorForSER import TensorDatasetCreatorForSER
+import Datasets as datasets
 import Model_Learning_Tools as mlt
 import Models as models
 
 # =============================================================================
-# Loading the datasets
+# Load the datasets
 # =============================================================================
 
 # dataset loaders
-emodb_loader = EmoDB_loader()
-iemocap_loader = IEMOCAP_loader()
-tdc = TensorDatasetCreatorForSER()
+emodb_loader = datasets.EmoDB_loader()
+iemocap_loader = datasets.IEMOCAP_loader()
+tdc = datasets.TensorDatasetCreatorForSER()
 
 # load melsp datasets
 iemocap_melsp, iemocap_labels, iemocap_speakers = iemocap_loader.load_melsp_dataset(requires_speakers=True)
@@ -71,22 +69,25 @@ si_emodb_valid_loaders = [DataLoader(dataset, batch_size=emodb_batch_size) for d
 epochs = 100 # number of epochs
 patience = 7 # patience of early stopping
 device = 'cuda' if torch.cuda.is_available() else 'cpu' # device
+display_interval = 5
 
 # instantiate earlystopping modules
-earlystopping = mlt.EarlyStopping(patience=patience, path='./save_models', filename='sd_iemocap_TFNN_checkpoint_model.sav')
+# NOTE: you should change path and filename values appropriately if you have multiple models
+earlystopping = mlt.EarlyStopping(patience=patience, verbose=True, \
+                                  path='./save_models', filename='checkpoint_model.sav')
 
-# records
-train_loss = []
-valid_loss = []
-train_accuracy = []
-valid_accuracy = []
+# leaning logs
+train_loss_log = []
+valid_loss_log = []
+train_accuracy_log = []
+valid_accuracy_log = []
 elapsed_time = []
-outputs_list = []
 
 # instantiate the model
 model = models.TFNN_for_SER().to(device)
 
 # criterion and optimizer
+# we have different criterions for train and validation this time
 criterion_train = nn.CrossEntropyLoss()
 criterion_valid = nn.NLLLoss()
 optimizer = optim.Adam(model.parameters(), lr=0.0001)
@@ -97,14 +98,15 @@ optimizer = optim.Adam(model.parameters(), lr=0.0001)
 # =============================================================================
 
 # speaker-dependent learning
-for epoch in range(epochs):
+for epoch in range(1, epochs + 1):
     
     # training mode
     model.train()
     
-    # calculate train loss and training time of the epoch
-    t_loss, e_time, outputs_list_ = mlt.train_epoch(model, \
-                                     sd_iemocap_train_loader, criterion_train, optimizer, device=device, epoch=epoch, measure_time=True)
+    # calculate train loss (and training time) of the epoch
+    # NOTE: don't enable measure_gpu_time if you don't use GPU
+    t_loss, e_time = mlt.train_epoch(model, \
+                                     sd_iemocap_train_loader, criterion_train, optimizer, device=device, epoch=epoch)
     # evaluation mode
     model.eval()
     
@@ -115,20 +117,21 @@ for epoch in range(epochs):
     v_loss, v_acc = mlt.valid_multi_dataloaders(model, sd_iemocap_valid_loaders, criterion_valid, device=device)
     
     # record losses and accuracies
-    train_loss.append(t_loss)
-    valid_loss.append(v_loss)
-    train_accuracy.append(t_acc)
-    valid_accuracy.append(v_acc)
+    train_loss_log.append(t_loss)
+    valid_loss_log.append(v_loss)
+    train_accuracy_log.append(t_acc)
+    valid_accuracy_log.append(v_acc)
     elapsed_time.append(e_time)
-    outputs_list.append(outputs_list_)
     
-    # display log
-    print(f'#{epoch}: train_loss = {t_loss:.3f}, train_acc={t_acc:.3f}, valid_loss={v_loss:.3f}, valid_acc={v_acc:.3f}')
-    # print(f'#{epoch}: train_loss = {t_loss:.3f}, valid_loss={v_loss:.3f}, valid_acc={v_acc:.3f}')
-    if epoch % 10 == 0:
-        mlt.display_log(train_loss, valid_loss, train_accuracy, valid_accuracy, epoch=epoch)
+    # display current losses and accuracies
+    print(f'#{epoch}: Train loss = {train_loss_log[-1]:.3f}, Validation loss = {valid_loss_log[-1]:.3f}, Train accuracy = {train_accuracy_log[-1]:.3f}, valid_accuracy = {valid_accuracy_log[-1]:.3f}')
+    
+    # display learning and accuracy curves at certain interval
+    if epoch % display_interval == 0:
+        mlt.display_curves(train_loss_log, valid_loss_log, train_accuracy_log, valid_accuracy_log, epoch=epoch)
+    
     # early stopping
-    earlystopping(v_loss, model)
+    earlystopping(v_loss, t_acc, v_acc, model)
     if earlystopping.early_stop:
         print('Early Stopping!')
         break

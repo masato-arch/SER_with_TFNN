@@ -21,16 +21,19 @@ class EmoDB_loader:
         """
         REQUIREMENTS:
             1, Please put this file in the <project folder>/Datasets/
-            2, Please put 'EmoDB' folder in abovementionded path.
+            2, Please put 'download' folder in abovementionded path.
+            
+            NOTE: 'download' is the directory name in which Emo-DB dataset 
+                    is contained when you get one from official site.
         """
         # =============================================================================
         # Initialize the module
         #
         # The module holds paths to pickle files of preprocessed wav, labels and melspectrograms.
         # 
-        # If we don't have pickle, the dataset will be retrieved from dataset_path/EmoDB
+        # If we don't have pickle, the dataset will be retrieved from dataset_path/download
         # =============================================================================
-        self.dataset_path = dataset_path # the path in which 'EmoDB' folder exists
+        self.dataset_path = dataset_path # the path in which 'download' folder exists
         self.pickle_path = os.path.join(dataset_path, 'pickles') # the path to storage pickle files
         
         # paths to data files
@@ -39,7 +42,7 @@ class EmoDB_loader:
         self.labels_pickle_path = os.path.join(self.pickle_path, 'EmoDB_labels.pkl')
         self.speakers_pickle_path = os.path.join(self.pickle_path, 'EmoDB_speakers.pkl')
         
-        # if we don't have preprocessed pickle files, retrieve the dataset from 'EmoDB'
+        # if we don't have preprocessed pickle files, retrieve the dataset from 'download/'
         if not exists(self.wav_pickle_path) or not exists(self.labels_pickle_path) or not exists(self.speakers_pickle_path):
             
             # if we don't have 'pickles' folder, create one
@@ -47,7 +50,7 @@ class EmoDB_loader:
             if not exists(self.pickle_path):
                 os.mkdir(self.pickle_path)
             
-            # retrieve wav, label and speaker datas from 'EmoDB' folder
+            # retrieve wav, label and speaker datas from 'download/' folder
             initial_wav_datas, initial_labels, initial_speakers = self._load_data()
             wav_datas, labels, speakers = self._constrain_dataset(initial_wav_datas, initial_labels, initial_speakers)
             
@@ -164,7 +167,7 @@ class EmoDB_loader:
         Retrieving paths to every wav files.
         """
         print('retrieving paths...')
-        base_dir = os.path.join(self.dataset_path, 'EmoDB/wav/')
+        base_dir = os.path.join(self.dataset_path, 'download/wav/')
         wav_paths = sorted([os.path.join(base_dir, f) for f in os.listdir(base_dir)])
         print('done.')
         

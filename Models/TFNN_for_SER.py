@@ -88,18 +88,12 @@ class TFNN_for_SER(nn.Module):
        
         # forward process the segment
         x = self.bn(F.relu(self.tcl1(segment)))
-        #print(x)
         x = self.bn(F.relu(self.tcl2(x)))
-        #print(x)
         x = self.bn(F.relu(self.tcl3(x)))
-        #print(x)
         x = F.relu(self.tcl4(x))
-        #print(x)
         a = self.trl(x)
-        #print(a)
         
         # apply softmax to the segment and get the class probability
         p = F.softmax(a, dim=1)
-        #print(p)
         
         return p

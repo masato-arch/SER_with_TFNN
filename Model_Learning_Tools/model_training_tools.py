@@ -6,10 +6,8 @@ Created on Mon Aug  8 18:28:37 2022
 @author: Ark_001
 """
 
-import numpy as np
 import matplotlib.pyplot as plt
 import torch
-import torch.optim as optim
 from sklearn.metrics import confusion_matrix
 import seaborn as sns
 import pandas as pd
@@ -18,23 +16,23 @@ import pandas as pd
 # User Interfaces:
 #   train_epoch(): Method for 1 epoch training
 #   valid(): Method for validation during training
-#   valid_multi_dataloaders() validation during training for multiple test dataloaders
+#   valid_multi_dataloaders() validation during training for multiple valid dataloaders
 #   display_log(): Method to display the log during training
 #   classification_test(): Method for calculating confusion matrix and accuracy after training
 # =============================================================================
 
 def train_epoch(model, trainloader, criterion, optimizer, device='cpu', 
-        epoch=None, measure_time=False):
+        epoch=None, measure_gpu_time=False):
     
     """Method to train the model for 1 epoch"""
     
     # initialize the model
-    model.train()
-    train_loss = 0.0
-    running_loss = 0.0
+    model.train() # training mode
+    train_loss = 0.0 # total train loss of the epoch
+    running_loss = 0.0 # temporal loss during training
 
-    # if time measurement is enabled, start measuring here
-    if measure_time:
+    # if GPU time measurement is enabled, start measuring here
+    if measure_gpu_time:
         start = torch.cuda.Event(enable_timing=True)
         end = torch.cuda.Event(enable_timing=True)
         start.record()
@@ -55,12 +53,12 @@ def train_epoch(model, trainloader, criterion, optimizer, device='cpu',
         running_loss += loss.item()
         # output monitor for debugging
         
-        if count % 1000 == 0:
+        if count % 100 == 0:
             print(f'#{epoch}, data:{count*4}, running_loss:{running_loss / 100:1.3f}')
             running_loss = 0.0
     
     # time measuring end
-    if measure_time:
+    if measure_gpu_time:
         end.record()
         torch.cuda.synchronize()
         elapsed_time = start.elapsed_time(end) / 1000
@@ -71,43 +69,39 @@ def train_epoch(model, trainloader, criterion, optimizer, device='cpu',
     train_loss /= len(trainloader)
     return train_loss, elapsed_time
         
-def valid(model, testloader, criterion, device='cpu'):
+def valid(model, validloader, criterion, device='cpu'):
     
     """Method to validate the model"""
     # initilaize the model
-    model.eval()
+    model.eval() # evaluation (validation) mode
     
     with torch.no_grad():
-        total = 0
-        correct = 0
-        test_loss = 0
+        total = 0 # total number of datas
+        correct = 0 # total number of correct answers
+        valid_loss = 0 # total valid loss
             
-        # forward processing
-        for data in testloader:
+        for data in validloader:
             inputs, labels = data
             inputs = inputs.to(device)
             labels = labels.to(device)
-
+            
+            # forward processing
             outputs = model(inputs)
-            #print('outputs')
-            #print(outputs)
-            # calculating the test loss
-            test_loss += criterion(outputs, labels).item()
-            # calculating the accuracy
+            
+            # calculate the valid loss
+            valid_loss += criterion(outputs, labels).item()
+            
+            # calculate the accuracy
             _, prediction = torch.max(outputs, 1)
-            #print('prediction')
-            #print(prediction)
-            #print('labels')
-            #print(labels)
             total += len(outputs)
             correct += (prediction==labels).sum().item()
         
-        test_loss /= len(testloader)
-        test_accuracy = correct / total
+        valid_loss /= len(validloader)
+        valid_accuracy = correct / total
 
-    return test_loss, test_accuracy
+    return valid_loss, valid_accuracy
 
-def valid_multi_dataloaders(model, testloaders, criterion, device='cpu'):
+def valid_multi_dataloaders(model, validloaders, criterion, device='cpu'):
     
     """Method for validation with multiple dataloaders"""
     # =============================================================================
@@ -116,7 +110,7 @@ def valid_multi_dataloaders(model, testloaders, criterion, device='cpu'):
     # =============================================================================
     with torch.no_grad():
         # total dataloader length for calculating mean loss
-        dataloader_len = sum([len(loader) for loader in testloaders])
+        dataloader_len = sum([len(loader) for loader in validloaders])
         model.eval()
         
         corrects = 0
@@ -124,13 +118,11 @@ def valid_multi_dataloaders(model, testloaders, criterion, device='cpu'):
         valid_loss = 0.0
         
         # calculate total loss, number of correct answers and number of datas over all dataloaders
-        for loader in testloaders:
+        for loader in validloaders:
             v_loss, corrects_, total_ = _half_valid(model, loader, criterion, device=device)
-            print(f'valid_v: corrects_:{corrects_}, total_:{total_}')
             valid_loss += v_loss
             corrects += corrects_
             total += total_
-            print(f'valid_v: corrects:{corrects}, total:{total}')
         
         # calculate means of them
         valid_loss /= dataloader_len
@@ -138,23 +130,27 @@ def valid_multi_dataloaders(model, testloaders, criterion, device='cpu'):
     
     return valid_loss, valid_accuracy
 
-def display_log(train_losses, test_losses, train_accuracy, test_accuracy, epoch=None):
+def display_curves(train_loss_log, valid_loss_log, train_accuracy_log, valid_accuracy_log, epoch=None):
     
-    """Method to display the learning process"""
+    """Method to display learning and accuracy curves"""
     
-    print(f'plot_log: #{epoch}, train_accuracy:{train_accuracy[-1]}, test_accuracy:{test_accuracy[-1]}')
     plt.figure(figsize=(12, 4))
     
     # plot the loss curve
     plt.subplot(1, 2, 1)
-    plt.plot(train_losses, label='train_loss')
-    plt.plot(test_losses, label='test_loss')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.xlim(left=1)
+    plt.plot(train_loss_log, label='train_loss')
+    plt.plot(valid_loss_log, label='valid_loss')
     plt.legend()
     
     # plot the accuracy curve１
     plt.subplot(1, 2, 2)
-    plt.plot(train_accuracy, label='train_accuracy')
-    plt.plot(test_accuracy, label='test_accuracy')
+    plt.xlabel('Epochs')
+    plt.ylabel('Accuracy')
+    plt.plot(train_accuracy_log, label='train_accuracy')
+    plt.plot(valid_accuracy_log, label='valid_accuracy')
     plt.legend()
     
     plt.show()
@@ -249,7 +245,7 @@ def _show_confusion_matrix(cm):
     plt.ylabel('True labels')
     plt.show()
     
-def _half_valid(model, testloader, criterion, device='cpu'):
+def _half_valid(model, validloader, criterion, device='cpu'):
     # =============================================================================
     # Valid method for valid_multi_dataloaders() method.
     # 'half' means that the loss and accuracy aren't be calculated completely.
@@ -262,14 +258,14 @@ def _half_valid(model, testloader, criterion, device='cpu'):
         valid_loss = 0
             
         # forward processing
-        for data in testloader:
+        for data in validloader:
             inputs, labels = data
             inputs = inputs.to(device)
             labels = labels.to(device)
 
             outputs = model(inputs)
 
-            # calculating the test loss
+            # calculating the valid loss
             valid_loss += criterion(outputs, labels).item()
             # calculating the accuracy
             _, prediction = torch.max(outputs, 1)
