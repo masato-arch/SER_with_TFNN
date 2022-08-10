@@ -33,6 +33,9 @@ class TensorDatasetCreatorForSER:
     # User Interfaces:
     #   speaker_dependent_dataset(): returns a speaker-dependent TensorDataset.
     #   speaker_independent_dataset(): returns a speaker-independent TensorDataset.
+    #   simple_speaker_dependent_dataset(): returns a 'simple' speaker-dependent TensorDataset,
+    #       which means the test set also contains only one-segment files.
+    #   simple_speaker_independent_dataset(): returns a 'simple speaker-independent TensorDataset
     #   set_random_seed(): use if you want to change random seed.
     # =============================================================================
     
@@ -80,6 +83,57 @@ class TensorDatasetCreatorForSER:
         print(f'Speaker-independent dataset created. Test speakers:{test_speakers}')
         
         return si_train_dataset, si_test_datasets, test_speakers
+    
+    def simple_speaker_dependent_dataset(self, datas, labels, train_size=0.8, shuffle=True):
+        # =============================================================================
+        # Method to create 'simple' speaker-dependent dataset, i.e. 
+        #   the number of segments in the test set is also all 1.
+        # 
+        # To implement this, we use _create_train_dataset() for creating both train and
+        #   test set.
+        # =============================================================================
+        
+        # split the dataset into training and test datasets randomly
+        train_datas, test_datas, train_labels, test_labels = \
+            train_test_split(datas, labels, random_state=self.random_seed, \
+                             shuffle=shuffle, train_size=train_size)
+        
+        # create the TensorDatasets
+        # sd stands for speaker-dependent
+        # NOTE: _create_train_dataset() is used for creating test_dataset
+        #   to get a dataset where all files have only 1 segment
+        sd_train_dataset = self._create_train_dataset(train_datas, train_labels)
+        sd_test_dataset = self._create_train_dataset(test_datas, test_labels)
+        return sd_train_dataset, sd_test_dataset
+    
+    def simple_speaker_independent_dataset(self, datas, labels, speakers, test_size=0.2, test_speakers=None):
+        # =============================================================================
+        # Method to create a 'simple' speaker-independent dataset, i.e. dataset with
+        # the different set of speakers in training and testing, and 
+        # the number of segments in the test set is also all 1.
+        # 
+        # Using same algorithms as simple_speaker_dependent_dataset()
+        # =============================================================================
+        
+        # if test_speakers are not specified, choose randomly
+        if not test_speakers:
+            speaker_set = list(set(speakers))
+            _, test_speakers = train_test_split(speaker_set, test_size=0.2, random_state=self.random_seed)
+        
+        # split the dataset into training and test datasets
+        # si stands for speaker-independent
+        si_train_datas, si_test_datas, si_train_labels, si_test_labels = \
+            self._speaker_independent_data_split(datas, labels, speakers, test_speakers=test_speakers)
+        
+        # create the TensorDatasets
+        # NOTE: _create_train_dataset() is used for creating test_dataset
+        #   to get a dataset where all files have only 1 segment
+        si_train_dataset = self._create_train_dataset(si_train_datas, si_train_labels)
+        si_test_dataset = self._create_train_dataset(si_test_datas, si_test_labels)
+        
+        print(f'Speaker-independent dataset created. Test speakers:{test_speakers}')
+        
+        return si_train_dataset, si_test_dataset, test_speakers
     
     def set_random_seed(self, random_seed):
         self.random_seed = random_seed

@@ -19,8 +19,6 @@ import numpy as np
 import tqdm
 
 
-
-
 class IEMOCAP_loader:
     
     def __init__(self, dataset_path='./Datasets'):
@@ -320,6 +318,7 @@ class IEMOCAP_loader:
         approved_labels = []
         approved_speakers = []
         comments = {}
+        bugfix_filenames = []
         for labelfiles in dialogwise_labelfiles:
             file_descriptors = [open(labelfile, 'r') for labelfile in labelfiles]
             while True:
@@ -328,6 +327,7 @@ class IEMOCAP_loader:
                     break
                 else:
                     filename, label, speaker, comments_ = _extract_values_from_lines(lines)
+                    bugfix_filenames.append(filename)
                     if label != None:
                         # print(f'labels:{labels_}, approved')
                         wav_idx = wav_filename_wo_ext.index(filename)
@@ -336,6 +336,10 @@ class IEMOCAP_loader:
                         approved_speakers.append(speaker)
                         comments[filename] = comments_
         
+        if bugfix_filenames == wav_filename_wo_ext:
+            print('filenames are correctly retrieved')
+        else:
+            raise Exception('something is wrong in retrieving filenames')
         print('done.')
         print('loading wav files, this process may take long...')
         approved_wav_datas = []

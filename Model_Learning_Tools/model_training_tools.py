@@ -53,6 +53,7 @@ def train_epoch(model, trainloader, criterion, optimizer, device='cpu',
         
         train_loss += loss.item()
         running_loss += loss.item()
+        # output monitor for debugging
         
         if count % 1000 == 0:
             print(f'#{epoch}, data:{count*4}, running_loss:{running_loss / 100:1.3f}')
@@ -72,7 +73,7 @@ def train_epoch(model, trainloader, criterion, optimizer, device='cpu',
         
 def valid(model, testloader, criterion, device='cpu'):
     
-    """Method to test the model"""
+    """Method to validate the model"""
     # initilaize the model
     model.eval()
     
@@ -88,16 +89,18 @@ def valid(model, testloader, criterion, device='cpu'):
             labels = labels.to(device)
 
             outputs = model(inputs)
-
+            #print('outputs')
+            #print(outputs)
             # calculating the test loss
             test_loss += criterion(outputs, labels).item()
             # calculating the accuracy
             _, prediction = torch.max(outputs, 1)
+            #print('prediction')
+            #print(prediction)
+            #print('labels')
+            #print(labels)
             total += len(outputs)
             correct += (prediction==labels).sum().item()
-            # debug log
-            print(f'valid_t: corrects_:{(prediction==labels).sum().item()}, total_:{len(outputs)}')
-            print(f'valid_t: corrects: {correct}, total:{total}')
         
         test_loss /= len(testloader)
         test_accuracy = correct / total
@@ -105,10 +108,11 @@ def valid(model, testloader, criterion, device='cpu'):
     return test_loss, test_accuracy
 
 def valid_multi_dataloaders(model, testloaders, criterion, device='cpu'):
+    
+    """Method for validation with multiple dataloaders"""
     # =============================================================================
-    # Method for validation with multiple dataloaders.
-    # The number of speech segments is different for each files, 
-    #   so we need multiple dataloaders for validation.
+    # In validation dataset, the number of speech segments is different by files. 
+    # Therefore we need multiple dataloaders.
     # =============================================================================
     with torch.no_grad():
         # total dataloader length for calculating mean loss
@@ -133,6 +137,7 @@ def valid_multi_dataloaders(model, testloaders, criterion, device='cpu'):
         valid_accuracy = corrects / total
     
     return valid_loss, valid_accuracy
+
 def display_log(train_losses, test_losses, train_accuracy, test_accuracy, epoch=None):
     
     """Method to display the learning process"""
@@ -188,7 +193,46 @@ def classification_test(model, testloader, device='cpu', class_labels=None):
         cm = _get_confusion_matrix(true_labels, predictions, class_labels=class_labels)
         _show_confusion_matrix(cm)
         
-    return accuracy, cm
+    return cm, accuracy
+
+
+def classification_test_multi_dataloaders(model, testloaders, device='cpu', class_labels=None):
+    with torch.no_grad():
+        # variables to get accuracy
+        total = 0
+        correct = 0
+        
+        # variables to get confusion matrix
+        predictions = []
+        true_labels = []
+        
+        for loader in testloaders:
+            
+            for data in loader:
+                inputs, labels = data
+                
+                # record the true labels to calculate the confusion matrix later
+                true_labels.extend(list(labels.numpy())) 
+                
+                # forward processings
+                inputs = inputs.to(device)
+                labels = labels.to(device)
+                outputs = model(inputs)
+                _, prediction = torch.max(outputs, 1)
+                
+                # record the number of correct answers
+                total += len(outputs)
+                correct += (prediction==labels).sum().item()
+                
+                # record the predicted labels
+                predictions.extend(list(prediction.to('cpu').numpy()))
+        
+        accuracy = correct / total
+        print(f'accuracy: {correct}/{total} = {accuracy}')
+        cm = _get_confusion_matrix(true_labels, predictions, class_labels=class_labels)
+        _show_confusion_matrix(cm)
+        
+    return cm, accuracy
 
 """
 Following codes are for internal processings. You don't have to read.
