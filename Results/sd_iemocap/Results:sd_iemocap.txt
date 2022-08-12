@@ -1,0 +1,9 @@
+Result record
+
+Dataset: IEMOCAP
+Condition: speaker-dependent
+
+epochs: 38 (early stopped due to big difference between train and test accuracy)
+
+WA: 593/1107 = 0.5356820234869015
+UA: 0.5816602209153339

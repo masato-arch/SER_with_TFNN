@@ -1,0 +1,11 @@
+Result record
+
+Dataset: Emo-DB
+Condition: speaker-dependent
+random seed: 1111
+
+epochs: 100
+
+WA: 61/68 = 0.8970588235294118
+UA: 0.8721001221001221
+

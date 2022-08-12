@@ -87,9 +87,9 @@ class TFNN_for_SER(nn.Module):
         # =============================================================================
        
         # forward process the segment
-        x = self.bn(F.relu(self.tcl1(segment)))
-        x = self.bn(F.relu(self.tcl2(x)))
-        x = self.bn(F.relu(self.tcl3(x)))
+        x = F.relu(self.tcl1(segment))
+        x = F.relu(self.tcl2(x))
+        x = F.relu(self.tcl3(x))
         x = F.relu(self.tcl4(x))
         a = self.trl(x)
         

@@ -8,9 +8,10 @@ Created on Mon Aug  8 18:28:37 2022
 
 import matplotlib.pyplot as plt
 import torch
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, accuracy_score, balanced_accuracy_score
 import seaborn as sns
 import pandas as pd
+import numpy as np
 
 # =============================================================================
 # User Interfaces:
@@ -18,7 +19,10 @@ import pandas as pd
 #   valid(): Method for validation during training
 #   valid_multi_dataloaders() validation during training for multiple valid dataloaders
 #   display_log(): Method to display the log during training
-#   classification_test(): Method for calculating confusion matrix and accuracy after training
+#   get_pred_true(): Method to get predicted and true labels to get confusion matrix and accuracy
+#   get_confusion_matrix(): Method to calculate confusion matrix
+#   accuracy_score(): from sklearn.metrics
+#   balanced_accuracy_score(): from sklearn.metrics
 # =============================================================================
 
 def train_epoch(model, trainloader, criterion, optimizer, device='cpu', 
@@ -130,32 +134,44 @@ def valid_multi_dataloaders(model, validloaders, criterion, device='cpu'):
     
     return valid_loss, valid_accuracy
 
-def display_curves(train_loss_log, valid_loss_log, train_accuracy_log, valid_accuracy_log, epoch=None):
+def display_curves(train_loss_log, valid_loss_log, train_accuracy_log, valid_accuracy_log):
     
     """Method to display learning and accuracy curves"""
     
-    plt.figure(figsize=(12, 4))
+    fig = plt.figure(figsize=(12, 4))
     
-    # plot the loss curve
-    plt.subplot(1, 2, 1)
-    plt.xlabel('Epochs')
-    plt.ylabel('Loss')
-    plt.xlim(left=1)
-    plt.plot(train_loss_log, label='train_loss')
-    plt.plot(valid_loss_log, label='valid_loss')
-    plt.legend()
+    # add subplots
+    ax_loss = fig.add_subplot(1, 2, 1)
+    ax_acc = fig.add_subplot(1, 2, 2)
     
-    # plot the accuracy curve１
-    plt.subplot(1, 2, 2)
-    plt.xlabel('Epochs')
-    plt.ylabel('Accuracy')
-    plt.plot(train_accuracy_log, label='train_accuracy')
-    plt.plot(valid_accuracy_log, label='valid_accuracy')
-    plt.legend()
+    # set the axis range
+    x = np.arange(1, len(train_loss_log) + 1)
     
+    # set titles
+    ax_loss.set_title('Loss Curve')
+    ax_acc.set_title('Accuracy Curve')
+    
+    # set axis labels
+    ax_loss.set_xlabel('Epochs')
+    ax_loss.set_ylabel('Loss')
+    ax_acc.set_xlabel('Epochs')
+    ax_acc.set_ylabel('Accuracy')
+    
+    # plot loss and accuracy logs
+    ax_loss.plot(x, train_loss_log, label='Train Loss')
+    ax_loss.plot(x, valid_loss_log, label='Validation Loss')
+    ax_loss.legend()
+    ax_acc.plot(x, train_accuracy_log, label='Train Accuracy')
+    ax_acc.plot(x, valid_accuracy_log, label='Validation Accuracy')
+    ax_acc.legend()
+    
+    plt.tight_layout()
     plt.show()
 
-def classification_test(model, testloader, device='cpu', class_labels=None):
+def get_pred_true(model, testloader, device='cpu', class_labels=None):
+    
+    """Method to get predicted labels and true labels"""
+    
     with torch.no_grad():
         # variables to get accuracy
         total = 0
@@ -184,21 +200,15 @@ def classification_test(model, testloader, device='cpu', class_labels=None):
             # record the predicted labels
             predictions.extend(list(prediction.to('cpu').numpy()))
         
-        accuracy = correct / total
-        print(f'accuracy: {correct}/{total} = {accuracy}')
-        cm = _get_confusion_matrix(true_labels, predictions, class_labels=class_labels)
-        _show_confusion_matrix(cm)
-        
-    return cm, accuracy
+    return predictions, true_labels
 
-
-def classification_test_multi_dataloaders(model, testloaders, device='cpu', class_labels=None):
+def get_pred_true_multi_dataloaders(model, testloaders, device='cpu', class_labels=None):
     with torch.no_grad():
-        # variables to get accuracy
+        # temporal variables
         total = 0
         correct = 0
         
-        # variables to get confusion matrix
+        # variables to return
         predictions = []
         true_labels = []
         
@@ -223,27 +233,23 @@ def classification_test_multi_dataloaders(model, testloaders, device='cpu', clas
                 # record the predicted labels
                 predictions.extend(list(prediction.to('cpu').numpy()))
         
-        accuracy = correct / total
-        print(f'accuracy: {correct}/{total} = {accuracy}')
-        cm = _get_confusion_matrix(true_labels, predictions, class_labels=class_labels)
-        _show_confusion_matrix(cm)
-        
-    return cm, accuracy
+    return predictions, true_labels
+
+def get_confusion_matrix(predictions, true_labels, class_labels=None, normalize=False):
+    cm = pd.DataFrame(confusion_matrix(true_labels, predictions), index=class_labels, columns=class_labels)
+    if normalize:
+        cm = cm.apply(lambda x: x / sum(x), axis=1)
+    return cm
+
+def show_confusion_matrix(cm):
+    ax = sns.heatmap(cm, square=True, cbar=True, annot=True, fmt='.3f', cmap='Blues')
+    plt.xlabel('Predicted')
+    plt.ylabel('True labels')
+    plt.show()
 
 """
 Following codes are for internal processings. You don't have to read.
 """
-
-def _get_confusion_matrix(true_labels, predictions, class_labels=None):
-    cm = confusion_matrix(true_labels, predictions)
-    cm = pd.DataFrame(data=cm, index=class_labels, columns=class_labels)
-    return cm
-
-def _show_confusion_matrix(cm):
-    ax = sns.heatmap(cm, square=True, cbar=True, annot=True, cmap='Blues')
-    plt.xlabel('Predicted')
-    plt.ylabel('True labels')
-    plt.show()
     
 def _half_valid(model, validloader, criterion, device='cpu'):
     # =============================================================================
