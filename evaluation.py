@@ -34,12 +34,12 @@ melsp_data, labels, speakers = loader.load_melsp_dataset(requires_speakers=True)
 """NOTE: please comment out either"""
 
 # speaker-dependent
-_, test_datasets = tdc.speaker_dependent_dataset(melsp_data, labels)
+# _, test_datasets = tdc.speaker_dependent_dataset(melsp_data, labels)
 
 # speaker-independent
 # test_speakers = ['Ses01M', 'Ses05F'] # test speakers for IEMOCAP
-# test_speakers = [9, 14] # test speakers for Emo-DB
-# _, test_datasets, test_speakers = tdc.speaker_independent_dataset(melsp_data, labels, speakers, test_speakers=test_speakers)
+test_speakers = [9, 14] # test speakers for Emo-DB
+_, test_datasets, test_speakers = tdc.speaker_independent_dataset(melsp_data, labels, speakers, test_speakers=test_speakers)
 
 # =============================================================================
 # Create the Test dataloaders

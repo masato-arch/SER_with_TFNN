@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Sat Aug 13 02:14:58 2022
+Created on Sat Aug 13 09:23:01 2022
 
 @author: Ark_001
 """
 
-import os
+import statistics
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -68,13 +68,12 @@ epochs = 100 # number of epochs
 patience = 20 # patience of early stopping
 acc_threshold = 1 # accuracy threshold of early stopping
 device = 'cuda' if torch.cuda.is_available() else 'cpu' # device
-lr = 0.001
+lr = 0.0001
 display_interval = 5 # interval of displaying curves
 
 
 # instantiate earlystopping modules
 # NOTE: YOU SHOULD CHANGE filename value appropriately if you have multiple models
-
 path = './save_models'
 filename = 'checkpoint_model.sav'
 earlystopping = mlt.EarlyStopping(patience=patience, criterion='accuracy', verbose=True, \
@@ -85,6 +84,8 @@ train_loss_log = []
 valid_loss_log = []
 train_accuracy_log = []
 valid_accuracy_log = []
+forward_time_log = []
+backward_time_log = []
 
 # instantiate the model
 model = models.TFNN_for_SER().to(device)
@@ -107,7 +108,7 @@ for epoch in range(1, epochs + 1):
     
     # calculate train loss (and training time) of the epoch
     # NOTE: don't enable measure_gpu_time if you don't use GPU
-    t_loss = mlt.train_epoch(model, train_loader, criterion_train, optimizer, device=device, epoch=epoch)
+    t_loss, fw_time, bw_time = mlt.train_epoch_tm(model, train_loader, criterion_train, optimizer, device=device, epoch=epoch)
     # evaluation mode
     model.eval()
     
@@ -122,9 +123,12 @@ for epoch in range(1, epochs + 1):
     valid_loss_log.append(v_loss)
     train_accuracy_log.append(t_acc)
     valid_accuracy_log.append(v_acc)
+    forward_time_log.append(fw_time)
+    backward_time_log.append(bw_time)
     
     # display current losses and accuracies
     print(f'#{epoch}: Train loss = {train_loss_log[-1]:.3f}, Validation loss = {valid_loss_log[-1]:.3f}, Train accuracy = {train_accuracy_log[-1]:.3f}, valid_accuracy = {valid_accuracy_log[-1]:.3f}')
+    print(f'#{epoch} Time log: forward time:{fw_time:.3f} sec, backward time:{bw_time:.3f} sec')
     
     # display learning and accuracy curves at certain interval
     if epoch % display_interval == 0:
@@ -135,8 +139,18 @@ for epoch in range(1, epochs + 1):
     if earlystopping.early_stop:
         print('Early Stopping!')
         break
-    
+
 # =============================================================================
 # Display the final outputs
 # =============================================================================
+
+# display learning curves
 mlt.display_curves(train_loss_log, valid_loss_log, train_accuracy_log, valid_accuracy_log)
+
+# display mean elapsed times for training
+mean_fw_time = statistics.mean(forward_time_log)
+mean_bw_time = statistics.mean(backward_time_log)
+
+print(f'Final: mean forward time: {mean_fw_time:.6f} sec, mean backward time: {mean_bw_time:.6f} sec')
+
+

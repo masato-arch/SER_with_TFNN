@@ -16,17 +16,18 @@ import numpy as np
 # =============================================================================
 # User Interfaces:
 #   train_epoch(): Method for 1 epoch training
+#   train_epoch_tm(): Method for 1 epoch training with GPU time measurement
 #   valid(): Method for validation during training
 #   valid_multi_dataloaders() validation during training for multiple valid dataloaders
 #   display_log(): Method to display the log during training
 #   get_pred_true(): Method to get predicted and true labels to get confusion matrix and accuracy
 #   get_confusion_matrix(): Method to calculate confusion matrix
+#   show_confusion_matrix(): Method to show confusion matrix
 #   accuracy_score(): from sklearn.metrics
 #   balanced_accuracy_score(): from sklearn.metrics
 # =============================================================================
 
-def train_epoch(model, trainloader, criterion, optimizer, device='cpu', 
-        epoch=None, measure_gpu_time=False):
+def train_epoch(model, trainloader, criterion, optimizer, device='cpu', epoch=None):
     
     """Method to train the model for 1 epoch"""
     
@@ -34,12 +35,6 @@ def train_epoch(model, trainloader, criterion, optimizer, device='cpu',
     model.train() # training mode
     train_loss = 0.0 # total train loss of the epoch
     running_loss = 0.0 # temporal loss during training
-
-    # if GPU time measurement is enabled, start measuring here
-    if measure_gpu_time:
-        start = torch.cuda.Event(enable_timing=True)
-        end = torch.cuda.Event(enable_timing=True)
-        start.record()
     
     # forward and backward processing
     for count, item in enumerate(trainloader):
@@ -47,31 +42,77 @@ def train_epoch(model, trainloader, criterion, optimizer, device='cpu',
         inputs = inputs.to(device)
         labels = labels.to(device)
         optimizer.zero_grad()
+        
+        # forward processing
         outputs = model(inputs)
         
+        # backward processing
         loss = criterion(outputs, labels)
         loss.backward()
         optimizer.step()
         
         train_loss += loss.item()
         running_loss += loss.item()
-        # output monitor for debugging
         
         if count % 100 == 0:
             print(f'#{epoch}, data:{count*4}, running_loss:{running_loss / 100:1.3f}')
             running_loss = 0.0
     
-    # time measuring end
-    if measure_gpu_time:
-        end.record()
+    # return train loss and elapsed time
+    train_loss /= len(trainloader)
+    return train_loss
+
+def train_epoch_tm(model, trainloader, criterion, optimizer, device='cpu', 
+        epoch=None):
+    
+    """Method to measure GPU time to train 1 epoch"""
+    
+    # initialize the model
+    model.train() # training mode
+    train_loss = 0.0 # total train loss of the epoch
+    running_loss = 0.0 # temporal loss during training
+
+    # Event object to measure GPU time
+    
+    # for forward processing
+    fw_start = torch.cuda.Event(enable_timing=True)
+    fw_end = torch.cuda.Event(enable_timing=True)
+    
+    # for backward processing
+    bw_start = torch.cuda.Event(enable_timing=True)
+    bw_end = torch.cuda.Event(enable_timing=True)
+    
+    # forward and backward processing
+    for count, item in enumerate(trainloader):
+        inputs, labels = item
+        inputs = inputs.to(device)
+        labels = labels.to(device)
+        optimizer.zero_grad()
+        
+        fw_start.record() # start measurement of forward here
+        outputs = model(inputs)
+        fw_end.record() # end measurement 
+        torch.cuda.synchronize() # wait until the processing on GPU ends
+        fw_elapsed_time = fw_start.elapsed_time(fw_end) / 1000 
+        
+        bw_start.record() # start measurement of backward here
+        loss = criterion(outputs, labels)
+        loss.backward()
+        optimizer.step()
+        bw_end.record() # end measurement
         torch.cuda.synchronize()
-        elapsed_time = start.elapsed_time(end) / 1000
-    else:
-        elapsed_time = None
+        bw_elapsed_time = bw_start.elapsed_time(bw_end) / 1000
+        
+        train_loss += loss.item()
+        running_loss += loss.item()
+        
+        if count % 100 == 0:
+            print(f'#{epoch}, data:{count*4}, running_loss:{running_loss / 100:1.3f}')
+            running_loss = 0.0
     
     # return train loss and elapsed time
     train_loss /= len(trainloader)
-    return train_loss, elapsed_time
+    return train_loss, fw_elapsed_time, bw_elapsed_time
         
 def valid(model, validloader, criterion, device='cpu'):
     
@@ -242,7 +283,7 @@ def get_confusion_matrix(predictions, true_labels, class_labels=None, normalize=
     return cm
 
 def show_confusion_matrix(cm):
-    ax = sns.heatmap(cm, square=True, cbar=True, annot=True, fmt='.3f', cmap='Blues')
+    ax = sns.heatmap(cm, square=True, annot=True, fmt='.3f', cmap='Blues')
     plt.xlabel('Predicted')
     plt.ylabel('True labels')
     plt.show()
