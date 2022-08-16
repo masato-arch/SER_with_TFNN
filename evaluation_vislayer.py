@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Sat Aug 13 00:11:25 2022
+Created on Wed Aug 17 05:07:41 2022
 
 @author: Ark_001
 """
+
 import os
 import torch
 from torch.utils.data import DataLoader
@@ -33,13 +34,13 @@ melsp_data, labels, speakers = loader.load_melsp_dataset(requires_speakers=True)
 """NOTE: please comment out either"""
 
 # speaker-dependent
-# tdc.set_random_seed(2222) random seed for train_test_split
-# _, test_datasets = tdc.speaker_dependent_dataset(melsp_data, labels)
+tdc.set_random_seed(2222) # random seed for train_test_split
+_, test_datasets = tdc.speaker_dependent_dataset(melsp_data, labels)
 
 # speaker-independent
 # test_speakers = ['Ses01M', 'Ses05F'] # test speakers for IEMOCAP
-test_speakers = [9, 14] # test speakers for Emo-DB
-_, test_datasets, test_speakers = tdc.speaker_independent_dataset(melsp_data, labels, speakers, test_speakers=test_speakers)
+# test_speakers = [9, 14] # test speakers for Emo-DB
+# _, test_datasets, test_speakers = tdc.speaker_independent_dataset(melsp_data, labels, speakers, test_speakers=test_speakers)
 
 # =============================================================================
 # Create the Test dataloaders
@@ -56,10 +57,10 @@ class_labels = list(tdc.emotion_mapping.keys()) #['Anger', 'Happiness', 'Neutral
 """NOTE: change filename according to the models"""
 
 path = './save_models'
-filename = 'si_emodb_bestmodel_r2222.sav'
+filename = 'checkpoint_model.sav'
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-best_model = models.TFNN_for_SER()
+best_model = models.TFNN_for_SER_vislayer()
 best_model.load_state_dict(torch.load(os.path.join(path, filename)))
 best_model = best_model.to(device)
 best_model.eval()
@@ -69,7 +70,7 @@ best_model.eval()
 # =============================================================================
 
 # get predicted and true_labels
-predictions, true_labels = mlt.get_pred_true_multi_dataloaders(best_model, test_dataloaders, device=device)
+predictions, true_labels, vis_layers = mlt.get_pred_true_multi_dataloaders_vislayer(best_model, test_dataloaders, device=device)
 
 # calculate confusion matrix
 cm = mlt.get_confusion_matrix(predictions, true_labels, class_labels=class_labels, normalize=True)

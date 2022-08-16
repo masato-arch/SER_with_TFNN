@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Sat Aug 13 02:14:58 2022
+Created on Wed Aug 17 05:54:17 2022
 
 @author: Ark_001
 """
@@ -54,8 +54,8 @@ train_dataset, valid_datasets = tdc.speaker_dependent_dataset(melsp_data, labels
 # =============================================================================
 
 """NOTE: choose either and comment the other out"""
-batch_size = 15 # batch size for Emo-DB
-# batch_size = 25 # batch size for IEMOCAP
+# batch_size = 15 # batch size for Emo-DB
+batch_size = 25 # batch size for IEMOCAP
 
 train_loader = DataLoader(train_dataset, batch_size=batch_size)
 valid_loaders = [DataLoader(dataset, batch_size=batch_size) for dataset in valid_datasets]
@@ -87,7 +87,7 @@ train_accuracy_log = []
 valid_accuracy_log = []
 
 # instantiate the model
-model = models.TFNN_for_SER().to(device)
+model = models.TFNN_for_SER_vislayer().to(device)
 
 # criterion and optimizer
 # we have different criterions for train and validation this time
@@ -112,10 +112,10 @@ for epoch in range(1, epochs + 1):
     model.eval()
     
     # calculate train accuracy of the epoch
-    _, t_acc = mlt.valid(model, train_loader, criterion_valid, device=device)
+    _, t_acc = mlt.valid_vislayer(model, train_loader, criterion_valid, device=device)
     
     # calculate valid loss and valid accuracy of the epoch
-    v_loss, v_acc = mlt.valid_multi_dataloaders(model, valid_loaders, criterion_valid, device=device)
+    v_loss, v_acc, vis_layer = mlt.valid_multi_dataloaders_vislayer(model, valid_loaders, criterion_valid, device=device)
     
     # record losses and accuracies
     train_loss_log.append(t_loss)

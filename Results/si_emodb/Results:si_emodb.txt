@@ -8,5 +8,6 @@ epochs: 84 (early stopped by exceeding stop counter)
 WA: 64/71 = 0.9014084507042254
 UA: 0.8663793103448276
 
-Mean foraward time: 0.002009 sec
-Mean backward time: 0.005271 sec
+Mean forward time: 0.001835 sec
+Mean backward time: 0.005026 sec
+batch_size: 15

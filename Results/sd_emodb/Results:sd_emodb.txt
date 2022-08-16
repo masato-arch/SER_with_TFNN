@@ -8,3 +8,7 @@ epochs: 100
 
 WA: 58/68 = 0.8529411764705882
 UA: 0.8212375859434683
+
+mean forward time: 0.001837 sec
+mean backward time: 0.005028 sec
+batch size: 15

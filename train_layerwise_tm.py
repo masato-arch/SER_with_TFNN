@@ -6,6 +6,7 @@ Created on Sat Aug 13 09:23:01 2022
 @author: Ark_001
 """
 
+import numpy as np
 import statistics
 import torch
 import torch.nn as nn
@@ -23,9 +24,9 @@ import Models as models
 
 """NOTE: choose either and comment the other out"""
 # Emo-DB
-loader = datasets.EmoDB_loader()
+# loader = datasets.EmoDB_loader()
 # IEMOCAP
-# loader = datasets.IEMOCAP_loader()
+loader = datasets.IEMOCAP_loader()
 
 # load melsp datasets
 melsp_data, labels, speakers = loader.load_melsp_dataset(requires_speakers=True)
@@ -44,8 +45,8 @@ tdc = datasets.TensorDatasetCreatorForSER()
 # train_dataset, valid_datasets = tdc.speaker_dependent_dataset(melsp_data, labels)
 
 # speaker-independent (si) datasets
-# test_speakers = ['Ses01M', 'Ses05F'] # for IEMOCAP
-test_speakers = [9, 14] # for Emo-DB
+test_speakers = ['Ses01M', 'Ses05F'] # for IEMOCAP
+# test_speakers = [9, 14] # for Emo-DB
 train_dataset, valid_datasets, valid_speakers = tdc.speaker_independent_dataset(\
     melsp_data, labels, speakers, test_speakers=test_speakers)
 
@@ -54,8 +55,8 @@ train_dataset, valid_datasets, valid_speakers = tdc.speaker_independent_dataset(
 # =============================================================================
 
 """NOTE: choose either and comment the other out"""
-batch_size = 15 # batch size for Emo-DB
-# batch_size = 25 # batch size for IEMOCAP
+# batch_size = 15 # batch size for Emo-DB
+batch_size = 25 # batch size for IEMOCAP
 
 train_loader = DataLoader(train_dataset, batch_size=batch_size)
 valid_loaders = [DataLoader(dataset, batch_size=batch_size) for dataset in valid_datasets]
@@ -84,18 +85,19 @@ train_loss_log = []
 valid_loss_log = []
 train_accuracy_log = []
 valid_accuracy_log = []
-forward_time_log = []
-backward_time_log = []
+layerwise_times = []
 
 # instantiate the model
-model = models.TFNN_for_SER().to(device)
+model = models.TFNN_for_SER_tm().to(device)
 
 # criterion and optimizer
 # we have different criterions for train and validation this time
 criterion_train = nn.CrossEntropyLoss()
 criterion_valid = nn.NLLLoss()
-optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=0.01)
+optimizer = optim.Adam(model.parameters(), lr=lr)
 
+start = torch.cuda.Event(enable_timing=True)
+end = torch.cuda.Event(enable_timing=True)
 
 # =============================================================================
 # Train the model
@@ -106,29 +108,32 @@ for epoch in range(1, epochs + 1):
     # training mode
     model.train()
     
+    start.record()
+    end.record()
+    torch.cuda.synchronize()
+    
     # calculate train loss (and training time) of the epoch
     # NOTE: don't enable measure_gpu_time if you don't use GPU
-    t_loss, fw_time, bw_time = mlt.train_epoch_tm(model, train_loader, criterion_train, optimizer, device=device, epoch=epoch)
+    t_loss, times = mlt.train_epoch_layerwise_tm(model, train_loader, criterion_train, optimizer, device=device, epoch=epoch)
     # evaluation mode
     model.eval()
     
     # calculate train accuracy of the epoch
-    _, t_acc = mlt.valid(model, train_loader, criterion_valid, device=device)
+    _, t_acc = mlt.valid_tm(model, train_loader, criterion_valid, device=device)
     
     # calculate valid loss and valid accuracy of the epoch
-    v_loss, v_acc = mlt.valid_multi_dataloaders(model, valid_loaders, criterion_valid, device=device)
+    v_loss, v_acc, _ = mlt.valid_multi_dataloaders_tm(model, valid_loaders, criterion_valid, device=device)
     
-    # record losses and accuracies
+    # record loss, accuracy and time
     train_loss_log.append(t_loss)
     valid_loss_log.append(v_loss)
     train_accuracy_log.append(t_acc)
     valid_accuracy_log.append(v_acc)
-    forward_time_log.append(fw_time)
-    backward_time_log.append(bw_time)
+    layerwise_times.append(times)
     
     # display current losses and accuracies
     print(f'#{epoch}: Train loss = {train_loss_log[-1]:.3f}, Validation loss = {valid_loss_log[-1]:.3f}, Train accuracy = {train_accuracy_log[-1]:.3f}, valid_accuracy = {valid_accuracy_log[-1]:.3f}')
-    print(f'#{epoch} Time log: forward time:{fw_time:.3f} sec, backward time:{bw_time:.3f} sec')
+    print(f'#{epoch} Time consumed at each layer: {times} sec')
     
     # display learning and accuracy curves at certain interval
     if epoch % display_interval == 0:
@@ -148,9 +153,10 @@ for epoch in range(1, epochs + 1):
 mlt.display_curves(train_loss_log, valid_loss_log, train_accuracy_log, valid_accuracy_log)
 
 # display mean elapsed times for training
-mean_fw_time = statistics.mean(forward_time_log)
-mean_bw_time = statistics.mean(backward_time_log)
+layerwise_times = np.array(layerwise_times)
+layerwise_mean_times = np.mean(layerwise_times, axis=0)
 
-print(f'Final: mean forward time: {mean_fw_time:.6f} sec, mean backward time: {mean_bw_time:.6f} sec')
+print(f'Final: mean layerwise time: {layerwise_mean_times} sec')
+print(f'mean time for processing 1 batch: {sum(layerwise_mean_times)} sec')
 
 

@@ -1,9 +1,0 @@
-Result record
-
-Dataset: Emo-DB
-Condition: speaker-independent
-
-epochs: 100
-
-WA: 66/68 = 0.9705882352941176
-UA: 0.9545454545454546
