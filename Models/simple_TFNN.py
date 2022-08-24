@@ -6,6 +6,7 @@ Created on Tue Aug  9 14:10:14 2022
 @author: Ark_001
 """
 
+from .TFNN_for_SER import TFNN_for_SER
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -13,7 +14,7 @@ import tensorly as tl
 import tltorch
 
 
-class simple_TFNN(nn.Module):
+class simple_TFNN(TFNN_for_SER):
     
     def __init__(self):
         super().__init__()

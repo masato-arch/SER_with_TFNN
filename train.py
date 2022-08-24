@@ -14,7 +14,10 @@ from torch.utils.data import DataLoader
 
 # Following modules are self-made
 import Datasets as datasets
-import Model_Learning_Tools as mlt
+import Model_Learning_Tools.Train as trainer
+import Model_Learning_Tools.Validation as validator
+import Model_Learning_Tools.Evaluation as evaluator
+import Model_Learning_Tools.Display as display
 import Models as models
 
 # =============================================================================
@@ -77,7 +80,7 @@ display_interval = 5 # interval of displaying curves
 
 path = './save_models'
 filename = 'checkpoint_model.sav'
-earlystopping = mlt.EarlyStopping(patience=patience, criterion='accuracy', verbose=True, \
+earlystopping = trainer.EarlyStopping(patience=patience, criterion='accuracy', verbose=True, \
                                   acc_threshold=acc_threshold, path=path, filename=filename)
 
 # leaning logs
@@ -107,15 +110,15 @@ for epoch in range(1, epochs + 1):
     
     # calculate train loss (and training time) of the epoch
     # NOTE: don't enable measure_gpu_time if you don't use GPU
-    t_loss = mlt.train_epoch(model, train_loader, criterion_train, optimizer, device=device, epoch=epoch)
+    t_loss = trainer.train_epoch(model, train_loader, criterion_train, optimizer, device=device, epoch=epoch)
     # evaluation mode
     model.eval()
     
     # calculate train accuracy of the epoch
-    _, t_acc = mlt.valid(model, train_loader, criterion_valid, device=device)
+    _, t_acc = validator.valid(model, train_loader, criterion_valid, device=device)
     
     # calculate valid loss and valid accuracy of the epoch
-    v_loss, v_acc = mlt.valid_multi_dataloaders(model, valid_loaders, criterion_valid, device=device)
+    v_loss, v_acc = validator.valid_md(model, valid_loaders, criterion_valid, device=device)
     
     # record losses and accuracies
     train_loss_log.append(t_loss)
@@ -128,7 +131,7 @@ for epoch in range(1, epochs + 1):
     
     # display learning and accuracy curves at certain interval
     if epoch % display_interval == 0:
-        mlt.display_curves(train_loss_log, valid_loss_log, train_accuracy_log, valid_accuracy_log)
+        display.display_curves(train_loss_log, valid_loss_log, train_accuracy_log, valid_accuracy_log)
     
     # early stopping
     earlystopping(v_acc, t_acc, v_acc, model)
@@ -139,4 +142,4 @@ for epoch in range(1, epochs + 1):
 # =============================================================================
 # Display the final outputs
 # =============================================================================
-mlt.display_curves(train_loss_log, valid_loss_log, train_accuracy_log, valid_accuracy_log)
+display.display_curves(train_loss_log, valid_loss_log, train_accuracy_log, valid_accuracy_log)

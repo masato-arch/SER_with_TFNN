@@ -11,3 +11,10 @@ UA: 0.8663793103448276
 Mean forward time: 0.001835 sec
 Mean backward time: 0.005026 sec
 batch_size: 15
+
+model2
+
+epochs: 100
+
+WA: 63/71 = 0.8873239436619719
+UA: 0.8455459770114943
